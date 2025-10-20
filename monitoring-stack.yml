@@ -1,0 +1,95 @@
+
+services:
+  # --- 1. cAdvisor (Metrics Exporter) ---
+  # 클러스터의 모든 노드에서 메트릭을 수집하는 에이전트
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor_agent
+    
+    deploy:
+      mode: global # <--- 모든 노드에 cAdvisor 인스턴스 배치
+      placement:
+        constraints:
+          - node.platform.os == linux # Linux 노드에만 배포
+      resources:
+        limits:
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+        
+    # 각 노드의 리소스를 읽기 위해 필요한 볼륨 마운트
+    volumes:
+      - "/:/rootfs:ro"
+      - "/var/run:/var/run:rw"
+      - "/sys:/sys:ro"
+      - "/var/lib/docker/:/var/lib/docker:ro"
+      - "/dev/disk/:/dev/disk:ro"
+      
+    networks:
+      - monitor_net
+      
+    # Prometheus가 각 노드의 9559 포트로 접근하도록 포트 노출
+    ports:
+      - "9559:8080" 
+      
+  # --- 2. Prometheus (Time Series Database) ---
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus_server
+    
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager # 안정성을 위해 매니저 노드에 배치
+    
+    ports:
+      - "9090:9090" # 외부 접근 포트
+      
+    networks:
+      - monitor_net
+      
+    volumes:
+      # 호스트의 설정 파일을 마운트 (cadvisor 서비스 이름을 타겟팅해야 함)
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro 
+      - prometheus-data:/prometheus # 데이터 영구 저장을 위한 명명된 볼륨
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  # --- 3. Grafana (Visualization) ---
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana_server
+    
+    deploy:
+      replicas: 1
+    
+    ports:
+      - "3000:3000" # 외부 대시보드 포트
+      
+    networks:
+      - monitor_net
+      
+    environment:
+      # 데이터 소스를 Prometheus 서비스 이름으로 설정
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_SECURITY_ADMIN_USER=admin # 관리자 사용자 이름 설정
+      - GF_SECURITY_ADMIN_PASSWORD=password # 관리자 암호 설정
+      
+    volumes:
+      - grafana-data:/var/lib/grafana
+      # 데이터 소스 및 대시보드 설정을 위한 호스트 파일 마운트
+      - ./datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./default.yaml:/etc/grafana/provisioning/dashboards/default.yaml:ro
+      - ./dashboard.json:/var/lib/grafana/dashboards/dashboard.json:ro
+
+# --- 볼륨 및 네트워크 정의 ---
+volumes:
+  grafana-data: {}
+  prometheus-data: {}
+
+networks:
+  monitor_net:
+    driver: overlay

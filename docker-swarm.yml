@@ -1,0 +1,86 @@
+services:
+  # --- 1. MongoDB (Data Tier) ---
+  mongodb:
+    image: mongo:4
+    volumes:
+      - mongodb-data:/data/db # 영구 데이터 저장을 위해 명명된 볼륨 사용 권장
+    deploy:
+      replicas: 1 # 단일 인스턴스 유지
+      placement:
+        constraints:
+          - node.role == manager # 매니저 노드에 배치
+    ports:
+      - "27017:27017" # 필요시 외부 접근 포트 노출
+    networks:
+      - back_net # 전용 네트워크 사용
+
+  # --- 2. Backend (API Tier) ---
+  backend:
+    image: harbor.local.net/myproject/backend:2.0_slim
+    # 컨테이너 이름을 명시하지 않고 Swarm이 관리하도록 합니다.
+    environment:
+      - PORT=8000
+      - GUESTBOOK_DB_ADDR=mongodb:27017 
+    deploy:
+      replicas: 3 # 3개 복제본 유지
+      placement:
+        constraints:
+          - node.role == worker # 워커 노드에 배치
+    networks:
+      - back_net
+      - proxy_net # HAProxy와 Frontend가 API에 접근하기 위한 네트워크
+
+  # --- 3. HAProxy (Internal Load Balancer) ---
+  haproxy_core:
+    image: harbor.local.net/myproject/haproxy:2.0
+
+    # 이 서비스는 HAProxy가 Frontend 트래픽을 Backend로 로드밸런싱하는 역할을 합니다.
+    deploy:
+      replicas: 1
+    # HAProxy는 내부 L4LB이므로, 호스트 포트를 노출하지 않습니다.
+    # volumes:
+    #   - ./confs/haproxy_swarm.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    networks:
+      - proxy_net # Backend와 Frontend 모두와 통신하기 위한 네트워크
+
+  # --- 4. Frontend (App Tier) ---
+  frontend:
+    image: harbor.local.net/myproject/frontend:2.0_slim
+    environment:
+      - PORT=8000
+      - GUESTBOOK_API_ADDR=haproxy_core:80 # 서비스 이름으로 HAProxy 접근
+    deploy:
+      replicas: 3 # 3개 복제본 유지
+      placement:
+        constraints:
+          - node.role == worker # 워커 노드에 배치
+    # Frontend는 Nginx와 통신하는 외부 네트워크와, HAProxy와 통신하는 네트워크가 필요합니다.
+    networks:
+      - web_net
+      - proxy_net
+
+  # --- 5. Nginx (Edge Proxy / Web Load Balancer) ---
+  web_proxy:
+    image: harbor.local.net/myproject/nginx_proxy:2.0
+    ports:
+      - "8888:80" # 외부 접속 포트 노출
+    deploy:
+      replicas: 1 
+      placement:
+        constraints:
+          - node.role == worker # 워커 노드에 배치
+    networks:
+      - web_net # Frontend와 연결
+
+# --- 네트워크 정의 (Overlay로 전환) ---
+networks:
+  back_net: # Backend <-> MongoDB
+    driver: overlay
+  proxy_net:  # Backend <-> HAProxy <-> Frontend
+    driver: overlay
+  web_net:  # Frontend <-> Nginx
+    driver: overlay
+
+volumes:
+  mongodb-data:
+    driver: local

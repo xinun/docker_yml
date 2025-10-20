@@ -1,0 +1,55 @@
+# services:
+#   mydb:
+#     image: mariadb:10.4.6
+#     container_name: mydb
+#     environment:
+#       MYSQL_ROOT_PASSWORD: pass123#
+#       MYSQL_DATABASE: dockertest
+#     restart: always
+#     volumes:
+#       - /home/kevin/volume_test:/var/lib/mysql
+    
+    
+
+services:
+  mysql-app:
+    image: mysql:8.0-debian
+    container_name: mysql-app
+    restart: always
+    ports: 
+      - "3306:3306"
+    volumes:
+      - mydb-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=password#
+      - MYSQL_DATABASE=appdb
+      - MYSQL_USER=wpuser
+      - MYSQL_PASSWORD=wppassword
+    networks:
+      - myapp-net
+
+  front:
+    depends_on:
+      - mysql-app
+    image: wordpress:latest
+    container_name: wordpress-app
+    restart: always
+    volumes:
+      - myweb-data:/var/www/html
+      - ${PWD}/myweb-log:/var/log
+    ports:
+      - "8888:80"
+    networks:
+      - myapp-net
+    environment:
+      - WORDPRESS_DB_HOST=mysql-app:3306
+      - WORDPRESS_DB_USER=wpuser
+      - WORDPRESS_DB_PASSWORD=wppassword
+      - WORDPRESS_DB_NAME=appdb
+
+volumes:
+  myweb-data: {}
+  mydb-data: {}
+
+networks:
+  myapp-net: {}

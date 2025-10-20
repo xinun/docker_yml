@@ -1,0 +1,37 @@
+services:
+  web:
+    image: harbor.local.net/myproject/myapp-web:1.0
+    ports:
+      - "80:80" 
+
+    deploy:
+      replicas: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+    networks:
+      - app-net
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: mysecretpassword
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+        - app-net
+
+networks:
+  app-net:
+    driver: overlay
+
+volumes:
+  db_data:

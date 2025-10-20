@@ -1,0 +1,42 @@
+services:
+  mongodb:
+    image: mongo:4
+    container_name: mongodb
+    restart: always
+    ports: 
+      - "17017:27017"
+    networks:
+      - devapp-net
+
+  backend:
+    image: dbgurum/guestbook:backend_1.0
+    container_name: backend
+    restart: always
+    # volumes:
+    #   - /home/kevin/proj/backend:/backend
+    networks:
+      - devapp-net
+    environment:
+      - PORT=8000
+      - GUESTBOOK_DB_ADDR=mongodb:27017  
+
+  frontend:
+    image: dbgurum/guestbook:frontend_1.0
+    container_name: frontend
+    restart: always
+    ports:
+      - "3000:8000"
+    networks:
+      - devapp-net
+    environment:
+      - PORT=8000
+      - BACKEND_ADDR=backend:8080
+    # volumes:
+    #   - /home/kevin/proj/frontend:/frontend
+
+volumes:
+  myweb-data: {}
+  mydb-data: {}
+
+networks:
+  devapp-net: {}
