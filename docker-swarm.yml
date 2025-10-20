@@ -3,7 +3,7 @@ services:
   mongodb:
     image: mongo:4
     volumes: 
-      - mongodb-data:/data/db # 영구 데이터 저장을 위해 명명된 볼륨 사용 권장
+      - mongodb-data:/data/db 
     deploy:
       replicas: 1 # 단일 인스턴스 유지
       placement:

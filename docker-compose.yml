@@ -6,8 +6,8 @@ services:
     container_name: mongodb
     networks:
       - backend-net # Backend 컨테이너만 접근
-    # volumes:
-      # - mongodb-data:/data/db # 영구 데이터 저장을 위해 명명된 볼륨을 사용 권장
+    volumes:
+      - mongodb-db:/data/db # 영구 데이터 저장을 위해 명명된 볼륨을 사용 권장
     restart: always
     ports:
       - "27017:27017"
@@ -21,7 +21,6 @@ services:
       - GUESTBOOK_DB_ADDR=mongodb:27017 # backend-net을 통한 DB 접근
     networks:
       - backend-net # DB 통신용
-      - proxy-net   # HAProxy 통신용 (L4 LB)
     restart: always
 
   backend2:
@@ -32,7 +31,6 @@ services:
       - GUESTBOOK_DB_ADDR=mongodb:27017
     networks:
       - backend-net
-      - proxy-net
     restart: always
 
   backend3:
@@ -43,7 +41,7 @@ services:
       - GUESTBOOK_DB_ADDR=mongodb:27017
     networks:
       - backend-net
-      - proxy-net
+ 
     restart: always
 
   # --- 3. HAProxy (Internal Load Balancer) ---
@@ -52,8 +50,7 @@ services:
     container_name: haproxy-core
     # Frontend에서 API 요청을 받기 위해 proxy-net에 연결
     networks:
-      - proxy-net
-      - frontend-net 
+      - backend-net
     ports:
       - "80:80"     # Frontend로부터의 API 요청 수신
       - "8404:8404" # HAProxy 관리 포트 노출
@@ -71,6 +68,7 @@ services:
       - "3000:8000"
     networks:
       - frontend-net # Nginx/Proxy 통신용
+      - backend-net  # HAProxy 통신용
     restart: always
   
   frontend2:
@@ -83,6 +81,7 @@ services:
       - "3001:8000"
     networks:
       - frontend-net
+      - backend-net
     restart: always
     
   frontend3:
@@ -95,6 +94,7 @@ services:
       - "3002:8000"
     networks:
       - frontend-net
+      - backend-net
     restart: always
 
   # --- 5. Nginx (Edge Proxy / Web Load Balancer) ---
@@ -111,8 +111,8 @@ services:
     restart: always
 
 # --- 볼륨 및 네트워크 정의 ---
-#volumes:
-  # mongodb-data: {} # 만약 영구 저장이 필요하다면 사용
+volumes:
+  mongodb-db: {} # 만약 영구 저장이 필요하다면 사용
 
 networks:
   backend-net: {} # MongoDB <-> Backend (데이터 통신)
