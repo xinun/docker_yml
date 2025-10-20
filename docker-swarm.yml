@@ -3,7 +3,7 @@ services:
   mongodb:
     image: mongo:4
     volumes: 
-      - mongodb-data:/data/db 
+      - mongodb-db:/data/db 
     deploy:
       replicas: 1 # 단일 인스턴스 유지
       placement:
@@ -17,18 +17,16 @@ services:
   # --- 2. Backend (API Tier) ---
   backend:
     image: harbor.local.net/myproject/backend:2.0_slim
-    # 컨테이너 이름을 명시하지 않고 Swarm이 관리하도록 합니다.
     environment:
       - PORT=8000
       - GUESTBOOK_DB_ADDR=mongodb:27017 
     deploy:
-      replicas: 3 # 3개 복제본 유지
+      replicas: 3 
       placement:
         constraints:
-          - node.role == worker # 워커 노드에 배치
+          - node.role == worker 
     networks:
       - back_net
-      - proxy_net # HAProxy와 Frontend가 API에 접근하기 위한 네트워크
 
   # --- 3. HAProxy (Internal Load Balancer) ---
   haproxy_core:
@@ -41,7 +39,7 @@ services:
     # volumes:
     #   - ./confs/haproxy_swarm.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     networks:
-      - proxy_net # Backend와 Frontend 모두와 통신하기 위한 네트워크
+      - back_net # Backend와 Frontend 모두와 통신하기 위한 네트워크
 
   # --- 4. Frontend (App Tier) ---
   frontend:
@@ -57,7 +55,7 @@ services:
     # Frontend는 Nginx와 통신하는 외부 네트워크와, HAProxy와 통신하는 네트워크가 필요합니다.
     networks:
       - web_net
-      - proxy_net
+      - back_net
 
   # --- 5. Nginx (Edge Proxy / Web Load Balancer) ---
   web_proxy:
@@ -76,11 +74,9 @@ services:
 networks:
   back_net: # Backend <-> MongoDB
     driver: overlay
-  proxy_net:  # Backend <-> HAProxy <-> Frontend
-    driver: overlay
   web_net:  # Frontend <-> Nginx
     driver: overlay
 
 volumes:  #몽고 디비 볼륨 설정
-  mongodb-data:
+  mongodb-db:
     driver: local
