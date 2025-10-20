@@ -116,5 +116,4 @@ volumes:
 
 networks:
   backend-net: {} # MongoDB <-> Backend (데이터 통신)
-  proxy-net: {}   # Backend <-> HAProxy (App Layer 통신)
   frontend-net: {} # Frontend <-> Nginx (웹 통신)
