@@ -79,7 +79,7 @@ services:
       resources: # <--- 리소스 추가
         limits:
           cpus: '0.1'
-          memory: 64M
+          memory: 128M
       placement:
         constraints:
           - node.role == worker # 워커 노드에 배치
