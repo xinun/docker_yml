@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mbti-frontend-ing
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx    # 너네 인그레스 클래스 이름에 맞춰
+  rules:
+    - http:                  # 👈 host 없음 → 192.168.0.189로 와도 매칭
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mbti-frontend
+                port:
+                  number: 80
+
