@@ -1,0 +1,235 @@
+# =========================================================
+# 0. Namespaces (frontend / backend / db)
+#    한 번 만들어두면 이후 apply -f 해도 다시 만들려고만 하고, 서비스는 안 끊김
+# =========================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: frontend
+  labels:
+    name: frontend
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: backend
+  labels:
+    name: backend
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: db
+  labels:
+    name: db
+
+# =========================================================
+# 1. 외부 Redis 매핑 (Service + Endpoints)
+#    → backend 네임스페이스 안에 둬서 백엔드가 바로 참조
+#    → backend 안에서 이름: redis-external.backend.svc.cluster.local
+# =========================================================
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-external
+  namespace: backend
+spec:
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: redis-external
+  namespace: backend
+subsets:
+  - addresses:
+      - ip: 10.178.0.7    # 너 외부 redis IP
+    ports:
+      - name: redis
+        port: 6379
+        protocol: TCP
+
+# =========================================================
+# 2. MongoDB (db 네임스페이스)
+#    service: mongodb.db.svc.cluster.local:27017
+# =========================================================
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: db
+  labels:
+    app: mongodb
+spec:
+  clusterIP: None
+  selector:
+    app: mongodb
+  ports:
+    - name: mongo
+      port: 27017
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - name: mongod
+          image: mongo:4
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: mongo
+              containerPort: 27017
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+      volumes:
+        - name: data
+          emptyDir: {}   # 필요하면 PVC로 교체
+
+# =========================================================
+# 3. Backend (backend 네임스페이스)
+#    service: mbti-backend.backend.svc.cluster.local:8080
+#    secret: mbti-saju-secrets (이미 backend ns 에 만들어뒀다고 했으니까 안 만들음)
+# =========================================================
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mbti-backend
+  namespace: backend
+spec:
+  selector:
+    app: mbti-backend
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mbti-backend
+  namespace: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mbti-backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: mbti-backend
+    spec:
+      containers:
+        - name: app
+          image: xinuun/mbti:backend_final
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "8080"
+
+            # MongoDB는 db 네임스페이스 기준으로 접근
+            - name: MONGODB_URI
+              value: "mongodb://mongodb.db.svc.cluster.local:27017/guestbook"
+            - name: GUESTBOOK_DB_ADDR
+              value: "mongodb.db.svc.cluster.local:27017"
+
+            # Redis는 backend 네임스페이스 안
+            - name: REDIS_ENABLED
+              value: "true"
+            - name: REDIS_HOST
+              value: "redis-external.backend.svc.cluster.local"
+            - name: REDIS_PORT
+              value: "6379"
+
+            # 여기 있는 시크릿은 네가 backend ns 에 이미 만들어놨다고 했으니 그대로 참조
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mbti-saju-secrets
+                  key: OPENAI_API_KEY
+          ports:
+            - containerPort: 8080
+
+# =========================================================
+# 4. Frontend (frontend 네임스페이스)
+#    service: mbti-frontend.frontend.svc.cluster.local
+#    프론트가 백엔드 호출할 때는 backend ns 의 서비스로 호출해야 함
+# =========================================================
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mbti-frontend
+  namespace: frontend
+spec:
+  selector:
+    app: mbti-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+  type: NodePort
+  # 필요하면 고정 포트도 줄 수 있음
+  # nodePort: 30080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mbti-frontend
+  namespace: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mbti-frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: mbti-frontend
+    spec:
+      containers:
+        - name: web
+          image: xinuun/mbti:frontend_final
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "80"
+            # 프론트가 호출할 백엔드 주소를 ns 포함으로 변경
+            - name: GUESTBOOK_API_ADDR
+              value: "mbti-backend.backend.svc.cluster.local:8080"
+          ports:
+            - containerPort: 80
+
