@@ -1,0 +1,93 @@
+// views/saju.pug
+doctype html
+html(lang="ko")
+    head
+        meta(charset='utf-8')
+        title 사주 운세 분석
+        meta(name='viewport', content='width=device-width, initial-scale=1')
+        
+        link(rel='stylesheet', href='https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css')
+        link(rel='preconnect', href='https://fonts.googleapis.com')
+        link(rel='preconnect', href='https://fonts.gstatic.com', crossorigin)
+        link(href='https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap', rel='stylesheet')
+
+        style.
+            body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8f9fa; color: #343a40; }
+            .header { background-color: #ffffff; padding: 2rem 0; border-bottom: 1px solid #dee2e6; margin-bottom: 2rem; }
+            .saju-container { background-color: #ffffff; border-radius: 15px; padding: 2rem 2.5rem; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.07); margin-bottom: 2rem; }
+            .result-box { border: 2px solid #007bff; padding: 20px; border-radius: 10px; background-color: #e9f7ff; }
+
+    body
+        .header
+            .container.text-center
+                h1: a(href='/') MBTI & Saju
+                div.mt-2
+                    a(href='/').text-muted.mr-3 MBTI 방명록
+                    a(href='/saju').text-muted 사주 운세 조회
+
+        .container
+            .saju-container
+                h2.mb-4 사주 운세 조회
+                
+                // --- 1. 입력 폼 (이름, 생년월일, 시간 입력) ---
+                form(action="/saju-analyze", method="POST")
+                    h4.mb-3 생년월일시 정보 입력
+                    
+                    // 이름 입력
+                    .form-group
+                        label(for="name") 이름
+                        input#name.form-control(type="text", name="name", placeholder="홍길동", required)
+                        
+                    // 생년월일 (년, 월, 일) 입력
+                    .row.mb-3
+                        .col-md-4.form-group
+                            label(for="year") 양력 년 (YYYY)
+                            input#year.form-control(type="number", name="year", placeholder="1990", required, min="1900", max="2100")
+                        .col-md-4.form-group
+                            label(for="month") 월 (MM)
+                            input#month.form-control(type="number", name="month", placeholder="1", required, min="1", max="12")
+                        .col-md-4.form-group
+                            label(for="day") 일 (DD)
+                            input#day.form-control(type="number", name="day", placeholder="1", required, min="1", max="31")
+                            
+                    // 태어난 시간 입력
+                    .form-group
+                        label(for="hour") 태어난 시간 (24시간제, 0~23시)
+                        input#hour.form-control(type="number", name="hour", placeholder="12", required, min="0", max="23")
+                    
+                    button.btn.btn-primary.mt-3(type="submit") 사주 분석하기
+
+                hr.my-5
+
+                // --- 2. 분석 결과 영역 ---
+                h3.mb-3 분석 결과
+
+                if error
+                    .alert.alert-danger #{error}
+                else if sajuResult && sajuResult.ganji
+                    .result-box
+                        // 사용자 입력 정보 표시
+                        p.lead.font-weight-bold #{sajuResult.name} 님의 사주 팔자
+                        
+                        // DB에서 가져온 간지 정보 표시
+                        p 간지 정보 (만세력 기반):
+                        ul.list-unstyled
+                            li 년주: #{sajuResult.ganji.year}
+                            li 월주: #{sajuResult.ganji.month}
+                            li 일주: #{sajuResult.ganji.day}
+                            li 시주: #{sajuResult.ganji.hour}
+                        
+                        if sajuResult.interpretation
+                            hr.my-4
+                            h5.font-weight-bold 🔮 GPT 운세 풀이
+                            p(style="white-space: pre-wrap;") #{sajuResult.interpretation}
+                    //- .alert.alert-info.mt-3
+                    //-     | #{sajuResult.message}           
+                else
+                    .alert.alert-secondary
+                        | 생년월일시를 입력하고 분석 버튼을 눌러주세요.
+        
+        // ... (스크립트 링크)
+        script(src='https://code.jquery.com/jquery-3.5.1.slim.min.js')
+        script(src='https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js')
+        script(src='https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js')

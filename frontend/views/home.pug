@@ -1,0 +1,378 @@
+doctype html
+html(lang="ko")
+    head
+        meta(charset='utf-8')
+        title MBTI Guestbook
+        meta(name='viewport' content='width=device-width, initial-scale=1')
+        
+        link(rel='stylesheet' href='https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css')
+        link(rel='preconnect' href='https://fonts.googleapis.com')
+        link(rel='preconnect' href='https://fonts.gstatic.com', crossorigin)
+        link(href='https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap' rel='stylesheet')
+
+        style.
+            body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8f9fa; color: #343a40; }
+            .header { background-color: #ffffff; padding: 2rem 0; border-bottom: 1px solid #dee2e6; margin-bottom: 2rem; }
+            .test-container { background-color: #ffffff; border-radius: 15px; padding: 2rem 2.5rem; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.07); margin-bottom: 2rem; }
+            .question-block { margin-bottom: 1.75rem; }
+            .card { border-radius: 15px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); border: none; }
+            .modal-content { border-radius: 15px; }
+
+    body
+        .header
+            .container.text-center
+                h1: a(href='/') 당신의 MBTI를 남겨주세요
+                div.mt-2
+                    a(href='/saju').text-muted.mr-3 사주 보기
+                    button#showResultBtn.btn.btn-sm.btn-outline-info(type="button" style="display:none;") 내 결과 다시보기
+                    button#debugFillBtn.btn.btn-sm.btn-warning.mt-2(type="button") [Debug: Auto-Fill]
+
+        .container
+            .test-container
+                form#mbtiForm(action="/post" method="POST")
+                    .d-flex.justify-content-between.align-items-center.mb-2
+                        h5 진행 상황
+                        h5#questionCounter (0 / 100)
+                    .progress.mb-4(style="height: 20px;")
+                        #progressBar.progress-bar.bg-success.progress-bar-striped.progress-bar-animated(role="progressbar" style="width: 0%;") 0%
+                    
+                    hr.my-4
+                    -
+                        let q_index = 0;
+
+                    //- 'questions' 변수는 app.js에서 res.render로 전달된 데이터입니다.
+                    each categoryQuestions, category in questions
+                        fieldset.my-4
+                            legend.h5.mb-3 #{category}
+                            each question in categoryQuestions
+                                - q_index++
+                                .question-block
+                                    p #{q_index}. #{question}
+                                    .btn-group.btn-group-toggle(data-toggle="buttons")
+                                        label.btn.btn-outline-secondary
+                                            input(type="radio", name=`q${q_index}`, value="-2", required)
+                                            span 매우 아니다
+                                        label.btn.btn-outline-secondary
+                                            input(type="radio", name=`q${q_index}`, value="-1")
+                                            span 아니다
+                                        label.btn.btn-outline-secondary
+                                            input(type="radio", name=`q${q_index}`, value="0")
+                                            span 보통
+                                        label.btn.btn-outline-secondary
+                                            input(type="radio", name=`q${q_index}`, value="1")
+                                            span 그렇다
+                                        label.btn.btn-outline-secondary
+                                            input(type="radio", name=`q${q_index}`, value="2")
+                                            span 매우 그렇다
+                    
+                    //- 폼 전송 시 DB에 저장될 숨겨진 필드들
+                    input(type="hidden" name="mbti" id="mbtiResultInput")
+                    input(type="hidden" name="scoreE" id="scoreE")
+                    input(type="hidden" name="scoreS" id="scoreS")
+                    input(type="hidden" name="scoreT" id="scoreT")
+                    input(type="hidden" name="scoreJ" id="scoreJ")
+                    input(type="hidden", name="mbtiJob", id="mbtiJobInput")
+                    input(type="hidden", name="mbtiImage", id="mbtiImageInput")
+                    input(type="hidden", name="mbtiComment", id="mbtiCommentInput")
+                    
+                    hr.my-4
+
+                    .text-center.mt-4
+                        button#calculateBtn.btn.btn-info.btn-lg(type="button", disabled) 결과 보기
+
+                    div#final-inputs(style="display:none;")
+                        hr.my-4
+                        h5.text-center.mb-3 마지막으로 정보를 입력해주세요.
+                        .row.justify-content-center
+                            .col-md-5.mb-3
+                                .input-group
+                                    .input-group-prepend
+                                        span.input-group-text Writer
+                                    input#name.form-control(type="text" name="name" placeholder="이름을 입력하세요", required)
+                            .col-md-5.mb-3
+                                .input-group
+                                    .input-group-prepend
+                                        span.input-group-text Date
+                                    input#date.form-control(type="date" name="date", required)
+                        .row.justify-content-center
+                            .col-md-10.mb-3
+                                .input-group
+                                    .input-group-prepend
+                                        span.input-group-text 한마디
+                                    input.form-control(type="text" name="memo" placeholder="결과에 대한 소감을 남겨보세요! (선택)")
+                        .row.justify-content-center
+                            .col-md-10.mb-3
+                                .input-group
+                                    .input-group-prepend
+                                        span.input-group-text 태그
+                                    input.form-control(type="text" name="tags" placeholder="쉼표(,)로 구분하여 자신을 표현해보세요.")
+                        .text-center.mt-4
+                            button#submitBtn.btn.btn-primary.btn-lg(type="submit", disabled) 결과 저장하기
+            hr
+
+            section#post-list
+                if messages && messages.length > 0
+                    h2.text-center.mb-4 방문자 기록
+                    .row
+                        each msg in messages
+                            .col-md-6.col-lg-4.mb-4
+                                .card
+                                    .card-body
+                                        h5.card-title #{msg.name}
+                                        p.card-text.mt-3
+                                            strong MBTI 결과: 
+                                            span.badge.badge-success.p-2 #{msg.mbti}
+                                        
+                                        //- 🌟 [수정] DB에 저장된 코멘트 표시
+                                        if msg.mbtiComment
+                                            p.card-text.font-italic.my-2(style="color: #555;") "#{msg.mbtiComment}"
+                                        
+                                        //- 🌟 [수정] DB에 저장된 이미지/직업 표시
+                                        if msg.mbtiImage
+                                            img.card-img-top.mt-2.mb-2(src=msg.mbtiImage, alt=msg.mbti, style="max-height: 150px; object-fit: contain;")
+                                        if msg.mbtiJob
+                                            p.card-text
+                                                strong 추천 직업:
+                                                span.text-muted #{msg.mbtiJob}
+                                        
+                                        if msg.memo
+                                            p.card-text.font-italic.mt-2
+                                                | "#{msg.memo}"
+                                        if msg.tags && msg.tags.length > 0
+                                            div.mt-2
+                                                each tag in msg.tags
+                                                    span.badge.badge-pill.badge-info.mr-1 #{tag}
+                                        hr
+                                        div.d-flex.justify-content-between.align-items-center
+                                            small.text-muted #{new Date(msg.createdAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+                                            div
+                                                span.mr-1(id=`likes-count-${msg._id}`) #{msg.likes || 0}
+                                                button.btn.btn-sm.btn-outline-danger.like-button(type="button", data-id=msg._id) ❤️
+                else
+                    .alert.alert-info(role='alert')
+                        | 아직 등록된 방명록이 없습니다.
+
+        #resultModal.modal.fade(tabindex="-1" role="dialog")
+            .modal-dialog.modal-dialog-centered(role="document")
+                .modal-content
+                    .modal-header
+                        h5.modal-title 🎉 당신의 MBTI 결과입니다!
+                        button.close(type="button" data-dismiss="modal"): span(aria-hidden="true") &times;
+                    .modal-body.text-center
+                        p.lead 당신의 성향을 나타내는 유형은...
+                        h1#modalResultText.font-weight-bold
+                        
+                        //- 🌟 [수정] 코멘트 표시 영역 추가
+                        p#modalResultComment.lead.font-italic(style="color: #555;")
+                        
+                        //- 🌟 [수정] 이미지/직업 표시 영역
+                        img#modalResultImage.img-fluid.my-3(src="" alt="MBTI 유형 이미지" style="max-height: 200px; display: none;")
+                        h5.mt-3 어울리는 직업
+                        p#modalResultJob.text-muted
+                    .modal-footer
+                        button.btn.btn-secondary(type="button" data-dismiss="modal") 닫기
+
+        script(src='https://code.jquery.com/jquery-3.5.1.slim.min.js')
+        script(src='https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js')
+        script(src='https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js')
+
+        script.
+            document.addEventListener('DOMContentLoaded', () => {
+
+                const mbtiData = {
+                    'ISTJ': { image: '/img/ISTJ.png', occupations: '회계사, 데이터 분석가, 품질 관리, 재무 관리자, 감정평가사, 판사', comment: '청렴결백한 논리주의자' },
+                    'ISFJ': { image: '/img/ISFJ.png', occupations: 'HR, 사회복지사, 상담사', comment: '용감한 수호자, 헌신적인 조력자' },
+                    'INFJ': { image: '/img/INFJ.png', occupations: '콘텐츠 전략가, UX 리서처, 비영리 기획, 데이터 과학자', comment: '선의의 옹호자' },
+                    'INTJ': { image: '/img/INTJ.png', occupations: '데이터 과학자, 시스템 아키텍트, 연구원', comment: '용의주도한 전략가' },
+                    'ISTP': { image: '/img/ISTP.png', occupations: '시스템 엔지니어, 보안분석가, 정비/유지보수', comment: '만능 재주꾼' },
+                    'ISFP': { image: '/img/ISFP.png', occupations: '프로젝트 매니저, 그래픽 디자이너, 사진가, 플로리스트', comment: '호기심 많은 예술가' },
+                    'INFP': { image: '/img/INFP.png', occupations: '작가/에디터, 심리상담, 브랜드 기획, 콘텐츠 크리에이터', comment: '열정적인 중재자, 이상을 향한 헌신' },
+                    'INTP': { image: '/img/INTP.png', occupations: '연구개발, 소프트웨어 엔지니어, 데이터 사이언티스트, 기업 아키텍트', comment: '논리적인 사색가' },
+                    'ESTP': { image: '/img/ESTP.png', occupations: '영업, 트레이더, 응급구조/현장대응, 이벤트 기획', comment: '모험을 즐기는 사업가' },
+                    'ESFP': { image: '/img/ESFP.png', occupations: '마케터, 쇼호스트, 공연/행사 기획', comment: '자유로운 영혼의 연예인' },
+                    'ENFP': { image: '/img/ENFP.png', occupations: '마케팅/캠페인 기획, 브랜드/캠페인 기획, HRD/조직문화, 스타트업 PM', comment: '재기발랄한 활동가' },
+                    'ENTP': { image: '/img/ENTP.png', occupations: '크리에이티브 디렉터, 사업개발, 프로젝트 매니저, 벤처캐피탈', comment: '뜨거운 논쟁을 즐기는 변론가' },
+                    'ESTJ': { image: '/img/ESTJ.png', occupations: '운영/생산관리, 프로젝트 매니저, 물류/서플라이, 총무/행정', comment: '엄격한 관리자, 질서의 수호자' },
+                    'ESFJ': { image: '/img/ESFJ.png', occupations: '고객관리/CS, HR, 교직/학사운영, 병원행정', comment: '사교적인 외교관' },
+                    'ENFJ': { image: '/img/ENFJ.png', occupations: '교육 기획, 커뮤니케이션 디렉터, 코치/컨설턴트, 커뮤니티 매니저', comment: '정의로운 사회 운동가' },
+                    'ENTJ': { image: '/img/ENTJ.png', occupations: '경영컨설턴트, 전략/기획, 기술영업', comment: '대담한 통솔자, 비전을 실현하는 전략가' },
+                    'DEFAULT': { image: '', occupations: '정보 없음', comment: '유형을 분석 중입니다.' }
+                };
+
+                const totalQuestions = 100; // 🌟 100문항 기준
+                const mbtiForm = document.getElementById('mbtiForm');
+                const debugFillBtn = document.getElementById('debugFillBtn');
+                const progressBar = document.getElementById('progressBar');
+                const nameInput = document.getElementById('name');
+                const dateInput = document.getElementById('date');
+                const mbtiResultInput = document.getElementById('mbtiResultInput');
+                const calculateBtn = document.getElementById('calculateBtn');
+                const finalInputs = document.getElementById('final-inputs');
+                const submitBtn = document.getElementById('submitBtn');
+                const showResultBtn = document.getElementById('showResultBtn');
+                const modalResultText = document.getElementById('modalResultText');
+                const questionCounter = document.getElementById('questionCounter');
+
+                const allRadios = document.querySelectorAll('input[type="radio"]');
+                allRadios.forEach(radio => {
+                    radio.addEventListener('click', () => {
+                        updateProgress();
+                        checkCompletion();
+                    });
+                });
+                
+                nameInput.addEventListener('input', checkCompletion);
+                dateInput.addEventListener('input', checkCompletion);
+
+                if (localStorage.getItem('userMBTI')) {
+                    showResultBtn.style.display = 'inline-block';
+                }
+                
+                // 디버그 버튼 (모두 '매우 그렇다' 선택)
+                debugFillBtn.addEventListener('click', () => {
+                    console.log('[DEBUG] Auto-filling all questions...');
+                    for (let i = 1; i <= totalQuestions; i++) {
+                        const radioToSelect = document.querySelector(`input[name="q${i}"][value="2"]`);
+                        if (radioToSelect && !radioToSelect.checked) {
+                            radioToSelect.click();
+                        }
+                    }
+                    updateProgress();
+                    checkCompletion();
+                    console.log('[DEBUG] Auto-fill complete.');
+                });
+
+                // '결과 보기' 버튼 클릭 시
+                calculateBtn.addEventListener('click', () => {
+                    const result = calculateMBTI(); // 1. 계산
+                    mbtiResultInput.value = result; // 2. 숨겨진 폼에 값 입력
+                    localStorage.setItem('userMBTI', result); // 3. 로컬 스토리지에 저장
+                    showResultModal(result); // 4. 모달 띄우기
+                    finalInputs.style.display = 'block'; // 5. '결과 저장' 섹션 보이기
+                    calculateBtn.style.display = 'none';
+                    showResultBtn.style.display = 'inline-block';
+                });
+                
+                showResultBtn.addEventListener('click', () => {
+                    const result = localStorage.getItem('userMBTI');
+                    if (result) showResultModal(result);
+                });
+                
+                function updateProgress() {
+                    const checkedRadios = document.querySelectorAll('input[type="radio"]:checked');
+                    const answeredCount = checkedRadios.length;
+                    const progress = (answeredCount / totalQuestions) * 100;
+                    
+                    progressBar.style.width = `${progress}%`;
+                    progressBar.textContent = `${Math.round(progress)}%`;
+                    questionCounter.textContent = `(${answeredCount} / ${totalQuestions})`;
+                }
+
+                function checkCompletion() {
+                    const allQuestionsAnswered = document.querySelectorAll('input[type="radio"]:checked').length === totalQuestions;
+                    calculateBtn.disabled = !allQuestionsAnswered; // '결과 보기' 버튼 활성화
+                    
+                    const writerFilled = nameInput.value.trim() !== '';
+                    const dateFilled = dateInput.value !== '';
+                    // '결과 저장' 버튼 활성화
+                    submitBtn.disabled = !(allQuestionsAnswered && writerFilled && dateFilled); 
+                }
+
+                // 🌟 [수정] 100문항 기준으로 MBTI 계산 로직
+                function calculateMBTI() {
+                    const scores = { E: 0, S: 0, T: 0, J: 0 };
+                    
+                    // app.js의 questions.js 데이터 구조에 의존
+                    const eiEnd = 26; // E/I 질문 1~26 (26개)
+                    const snEnd = eiEnd + 25; // S/N 질문 27~51 (25개)
+                    const tfEnd = snEnd + 24; // T/F 질문 52~75 (24개)
+                    const jpEnd = tfEnd + 25; // J/P 질문 76~100 (25개)
+
+                    for (let i = 1; i <= jpEnd; i++) { // 100번 반복
+                        const radio = document.querySelector(`input[name="q${i}"]:checked`);
+                        if(radio) {
+                            const value = parseInt(radio.value);
+                            
+                            // 🌟 [수정] 100문항 경계에 맞게 점수 합산
+                            if (i <= eiEnd) {         // 1-26
+                                scores.E += value;
+                            } else if (i <= snEnd) {  // 27-51
+                                scores.S += value;
+                            } else if (i <= tfEnd) {  // 52-75
+                                scores.T += value;
+                            } else if (i <= jpEnd) {  // 76-100
+                                scores.J += value;
+                            }
+                        }
+                    }
+
+                    // 숨겨진 폼에 점수 저장
+                    document.getElementById('scoreE').value = scores.E;
+                    document.getElementById('scoreS').value = scores.S;
+                    document.getElementById('scoreT').value = scores.T;
+                    document.getElementById('scoreJ').value = scores.J;
+
+                    // 결과 계산
+                    let result = '';
+                    result += (scores.E > 0) ? 'E' : 'I';
+                    result += (scores.S > 0) ? 'S' : 'N';
+                    result += (scores.T > 0) ? 'T' : 'F';
+                    result += (scores.J > 0) ? 'J' : 'P';
+                    
+                    // 숨겨진 폼에 이미지/직업/코멘트 저장
+                    const data = mbtiData[result] || mbtiData['DEFAULT'];
+                    document.getElementById('mbtiJobInput').value = data.occupations;
+                    document.getElementById('mbtiImageInput').value = data.image;
+                    document.getElementById('mbtiCommentInput').value = data.comment;
+                    
+                    return result;
+                }
+
+                // 🌟 [수정] 모달에 코멘트 표시 로직 추가
+                function showResultModal(result) {
+                    modalResultText.textContent = result;
+
+                    const data = mbtiData[result] || mbtiData['DEFAULT'];
+                    const imgEl = document.getElementById('modalResultImage');
+                    const jobEl = document.getElementById('modalResultJob');
+                    const commentEl = document.getElementById('modalResultComment'); // 👈 코멘트 Element
+
+                    if (data.image) {
+                        imgEl.src = data.image;
+                        imgEl.style.display = 'block';
+                    } else {
+                        imgEl.style.display = 'none';
+                    }
+                    jobEl.textContent = data.occupations;
+                    commentEl.textContent = `"${data.comment}"`; // 👈 코멘트 내용 채우기
+
+                    $('#resultModal').modal('show');
+                }
+                
+                function initializeLikeButtons() {
+                    const likeButtons = document.querySelectorAll('.like-button');
+                    likeButtons.forEach(button => {
+                        button.addEventListener('click', () => {
+                            const messageId = button.dataset.id;
+                            
+                            // 🌟 [수정] K8s 환경에서는 '/like/:id' 경로를 사용 (app.js 기준)
+                            fetch(`/like/${messageId}`, { method: 'POST' })
+                                .then(response => {
+                                    if (!response.ok) {
+                                        throw new Error('Network response was not ok');
+                                    }
+                                    return response.json();
+                                })
+                                .then(updatedMessage => {
+                                    const countSpan = document.getElementById(`likes-count-${messageId}`);
+                                    if (countSpan) {
+                                        countSpan.textContent = updatedMessage.likes;
+                                    }
+                                })
+                                .catch(error => console.error('Error:', error));
+                        });
+                    });
+                }
+                
+                initializeLikeButtons();
+            });
