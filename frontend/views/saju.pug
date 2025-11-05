@@ -1,4 +1,3 @@
-// views/saju.pug
 doctype html
 html(lang="ko")
     head
@@ -30,7 +29,8 @@ html(lang="ko")
                 h2.mb-4 사주 운세 조회
                 
                 // --- 1. 입력 폼 (이름, 생년월일, 시간 입력) ---
-                form(action="/saju-analyze", method="POST")
+                // [참고] id="saju-form"을 추가했지만, action/method는 그대로 둡니다.
+                form#saju-form(action="/saju-analyze", method="POST")
                     h4.mb-3 생년월일시 정보 입력
                     
                     // 이름 입력
@@ -61,33 +61,99 @@ html(lang="ko")
 
                 // --- 2. 분석 결과 영역 ---
                 h3.mb-3 분석 결과
-
-                if error
-                    .alert.alert-danger #{error}
-                else if sajuResult && sajuResult.ganji
-                    .result-box
-                        // 사용자 입력 정보 표시
-                        p.lead.font-weight-bold #{sajuResult.name} 님의 사주 팔자
-                        
-                        // DB에서 가져온 간지 정보 표시
-                        p 간지 정보 (만세력 기반):
-                        ul.list-unstyled
-                            li 년주: #{sajuResult.ganji.year}
-                            li 월주: #{sajuResult.ganji.month}
-                            li 일주: #{sajuResult.ganji.day}
-                            li 시주: #{sajuResult.ganji.hour}
-                        
-                        if sajuResult.interpretation
-                            hr.my-4
-                            h5.font-weight-bold 🔮 GPT 운세 풀이
-                            p(style="white-space: pre-wrap;") #{sajuResult.interpretation}
-                    //- .alert.alert-info.mt-3
-                    //-     | #{sajuResult.message}           
-                else
+                
+                // 🌟 [수정] 
+                // Pug의 'if/else' 조건문을 제거하고,
+                // JavaScript가 결과를 채워넣을 수 있도록 div#result-area 컨테이너로 변경합니다.
+                #result-area
                     .alert.alert-secondary
                         | 생년월일시를 입력하고 분석 버튼을 눌러주세요.
-        
-        // ... (스크립트 링크)
+
+        // ... (부트스트랩 스크립트 링크)
         script(src='https://code.jquery.com/jquery-3.5.1.slim.min.js')
         script(src='https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js')
         script(src='https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js')
+
+        // 🌟 [추가] 
+        // 폼(Form) 전송을 가로채고 Fetch API로 비동기 통신을 수행하는 JavaScript 코드
+        script.
+            // 1. 폼(form)을 선택하고 submit 이벤트를 가로챕니다.
+            const sajuForm = document.getElementById('saju-form');
+            
+            sajuForm.addEventListener('submit', async function(event) {
+                
+                // 2. 폼의 기본 동작(페이지 이동)을 막습니다.
+                event.preventDefault();
+
+                // 3. 폼 데이터를 가져옵니다.
+                const name = document.getElementById('name').value;
+                const year = document.getElementById('year').value;
+                const month = document.getElementById('month').value;
+                const day = document.getElementById('day').value;
+                const hour = document.getElementById('hour').value;
+                
+                const formData = { name, year, month, day, hour };
+
+                // 4. 로딩 상태를 표시합니다. (결과 영역과 버튼)
+                const resultContainer = document.getElementById('result-area');
+                const submitButton = sajuForm.querySelector('button[type="submit"]');
+                
+                resultContainer.innerHTML = `
+                    <div class="alert alert-info" role="alert">
+                        <h5 class="alert-heading">🔮 운세 분석 중...</h5>
+                        <p>GPT가 열심히 회원님의 운세를 분석하고 있습니다.<br/>
+                           이 작업은 **최대 5분**까지 소요될 수 있으니, 잠시만 기다려주세요.</p>
+                    </div>
+                `;
+                submitButton.disabled = true;
+                submitButton.innerText = '분석 중...';
+
+                try {
+                    // 5. Fetch API로 백엔드에 POST 요청을 보냅니다. (action 속성값 사용)
+                    const response = await fetch(sajuForm.action, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    });
+
+                    // 6. 응답(JSON)을 파싱합니다.
+                    const data = await response.json();
+
+                    if (!response.ok || data.ok === false) {
+                        // 7-1. API가 에러를 반환한 경우 (404, 500 등)
+                        throw new Error(data.error || '알 수 없는 서버 오류가 발생했습니다.');
+                    }
+
+                    // 7-2. API가 성공한 경우, 받은 JSON으로 HTML을 동적으로 생성합니다.
+                    resultContainer.innerHTML = `
+                        <div class="result-box">
+                            <p class="lead font-weight-bold">${data.ganji.name || name} 님의 사주 팔자</p>
+                            <p>간지 정보 (만세력 기반):</p>
+                            <ul class="list-unstyled">
+                                <li>년주: ${data.ganji.year}</li>
+                                <li>월주: ${data.ganji.month}</li>
+                                <li>일주: ${data.ganji.day}</li>
+                                <li>시주: ${data.ganji.hour}</li>
+                            </ul>
+                            
+                            <hr class="my-4">
+                            <h5 class="font-weight-bold">🔮 GPT 운세 풀이</h5>
+                            <p style="white-space: pre-wrap;">${data.interpretation}</p>
+                        </div>
+                    `;
+
+                } catch (error) {
+                    // 7-3. 네트워크 오류 또는 7-1에서 던진 오류를 처리합니다.
+                    resultContainer.innerHTML = `
+                        <div class="alert alert-danger">
+                            <strong>오류 발생:</strong> ${error.message}
+                        </div>
+                    `;
+                } finally {
+                    // 8. 버튼을 다시 활성화합니다.
+                    submitButton.disabled = false;
+                    submitButton.innerText = '사주 분석하기';
+                }
+            });

@@ -1,0 +1,191 @@
+# =========================================================
+# 0. Namespaces (frontend / backend / db)
+# =========================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: frontend
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: backend
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: db
+
+# =========================================================
+# 1-1. 외부 Redis 매핑 (Service + Endpoints) - [backend] NS
+# =========================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-external
+  namespace: backend # 🌟 backend 네임스페이스
+spec:
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: 6379
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: redis-external
+  namespace: backend # 🌟 backend 네임스페이스
+subsets:
+- addresses:
+  - ip: 10.178.0.7  # 외부 Redis IP
+  ports:
+  - name: redis
+    port: 6379
+    protocol: TCP
+
+---
+# =========================================================
+# 1-2. MongoDB (Deployment + Service) - [db] NS
+# =========================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: db # 🌟 db 네임스페이스
+  labels: { app: mongodb }
+spec:
+  clusterIP: None
+  selector: { app: mongodb }
+  ports:
+    - name: mongo
+      port: 27017
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: db # 🌟 db 네임스페이스
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mongodb }
+  template:
+    metadata:
+      labels: { app: mongodb }
+    spec:
+      containers:
+      - name: mongod
+        image: mongo:4
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: mongo
+          containerPort: 27017
+        volumeMounts:
+        - name: data
+          mountPath: /data/db
+      volumes:
+      - name: data
+        emptyDir: {}
+
+# =========================================================
+# 2. Backend (Deployment + Service) - [backend] NS
+# =========================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: mbti-backend
+  namespace: backend # 🌟 backend 네임스페이스
+spec:
+  selector: { app: mbti-backend }
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mbti-backend
+  namespace: backend # 🌟 backend 네임스페이스
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mbti-backend }
+  template:
+    metadata:
+      labels: { app: mbti-backend }
+    spec:
+      containers:
+      - name: app
+        image: xinuun/mbti:backend_final_pro
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: PORT
+          value: "8080"
+        
+        # 🌟 DNS 수정: MongoDB (mongodb.db.svc.cluster.local)
+        - name: MONGODB_URI
+          value: "mongodb://mongodb.db.svc.cluster.local:27017/guestbook"
+        - name: GUESTBOOK_DB_ADDR
+          value: "mongodb.db.svc.cluster.local:27017"
+
+        # 🌟 DNS 수정: Redis (redis-external.backend.svc.cluster.local)
+        - name: REDIS_ENABLED
+          value: "true"
+        - name: REDIS_HOST
+          value: "redis-external.backend.svc.cluster.local" # Endpoints가 backend NS에 있음
+        - name: REDIS_PORT
+          value: "6379"
+
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: mbti-saju-secrets
+              key: OPENAI_API_KEY
+        ports:
+        - containerPort: 8080
+
+# =========================================================
+# 3. Frontend (Deployment + Service) - [frontend] NS
+# =========================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: mbti-frontend
+  namespace: frontend # 🌟 frontend 네임스페이스
+spec:
+  selector: { app: mbti-frontend }
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mbti-frontend
+  namespace: frontend # 🌟 frontend 네임스페이스
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mbti-frontend }
+  template:
+    metadata:
+      labels: { app: mbti-frontend }
+    spec:
+      containers:
+      - name: web
+        image: xinuun/mbti:frontend_v2
+        imagePullPolicy: Always
+        env:
+        - name: PORT
+          value: "80"
+        
+        # 🌟 DNS 수정: Backend (mbti-backend.backend.svc.cluster.local)
+        - name: GUESTBOOK_API_ADDR
+          value: "mbti-backend.backend.svc.cluster.local:8080" # Backend는 backend NS에 있음
+
+        ports:
+        - containerPort: 80

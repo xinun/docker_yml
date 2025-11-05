@@ -149,7 +149,7 @@ spec:
     spec:
       containers:
         - name: app
-          image: xinuun/mbti:backend_final_2
+          image: xinuun/mbti:backend_final
           imagePullPolicy: IfNotPresent
           env:
             - name: PORT
@@ -230,6 +230,58 @@ spec:
             # 프론트가 호출할 백엔드 주소를 ns 포함으로 변경
             - name: GUESTBOOK_API_ADDR
               value: "mbti-backend.backend.svc.cluster.local:8080"
+            # - name: BACKEND_URI 
+            #   value: "http://mbti-backend.backend.svc.cluster.local:8080"
           ports:
             - containerPort: 80
 
+# =========================================================
+# 5. Ingress (외부 도메인 연결)
+#    mbti.local/     -> frontend (frontend ns)
+#    mbti.local/saju -> backend (backend ns)
+# =========================================================
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend-ing
+  namespace: frontend
+spec:
+  ingressClassName: nginx
+  rules:
+    # [수정] "host: m-t-i.local" 줄을 삭제
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mbti-frontend
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend-ing
+  namespace: backend # 2. backend Ingress는 backend 네임스페이스에 생성
+  annotations:
+    # 🌟 [답변] 바로 여기에 추가합니다.
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/rewrite-target: /api/analyze
+    
+spec:
+  ingressClassName: nginx
+  rules:
+    # [수정] "host: m-t-i.local" 줄을 삭제
+    - http:
+        paths:
+          - path: /saju-analyze
+            pathType: Prefix
+            backend:
+              service:
+                name: mbti-backend
+                port:
+                  number: 8080
