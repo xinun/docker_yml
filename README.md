@@ -1,4 +1,4 @@
-#  MBTI & 사주(만세력) 분석 웹 (Kubernetes Edition)
+#  MBTI & 사주(만세력) 분석 웹 (Kubernetes Edition)  Docker & k8s
 
 MBTI 성향 테스트 기반의 방명록과 만세력 데이터를 활용한 사주 분석 기능을 제공하는 Node.js 기반 웹 애플리케이션입니다. 이 프로젝트는 **Docker Compose**를 이용한 로컬 테스트와 **Kubernetes(K8s)** 클러스터 배포를 모두 지원하도록 설계되었습니다.
 
