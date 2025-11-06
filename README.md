@@ -72,3 +72,6 @@ MBTI 성향 테스트 기반의 방명록과 만세력 데이터를 활용한 �
 <img width="1916" height="913" alt="image" src="https://github.com/user-attachments/assets/862ef7a8-7f26-476b-a564-572570683e3e" />
 <img width="1899" height="923" alt="image" src="https://github.com/user-attachments/assets/38443361-052a-4018-90e5-d3f8d9291a54" />
 <img width="1441" height="910" alt="image" src="https://github.com/user-attachments/assets/66323830-8358-49bd-a360-ff485b77fa03" />
+<img width="741" height="825" alt="image" src="https://github.com/user-attachments/assets/3f743be2-c738-4015-aadb-8f286325470f" />
+
+
