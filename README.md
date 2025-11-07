@@ -42,9 +42,113 @@ MBTI 성향 테스트 기반의 방명록과 만세력 데이터를 활용한 �
 `k8s-master` 노드에서 `docker compose`를 사용하여 K8s 배포 전 빠르게 로컬 테스트를 진행할 수 있습니다.
 
 1.  (필수) GCP VPN 연결 및 `strongSwan`이 `ESTABLISHED` 상태여야 합니다.
-2.  (필수) `backend`의 `routes/sajuRouter.js`에 GCP Memorystore IP가 올바르게 입력되어 있는지 확인합니다.
+2.  (필수) `backend`의 `routes/saju.js`에 GCP Memorystore IP가 올바르게 입력되어 있는지 확인합니다.
 3.  프로젝트 루트에서 다음 명령어로 모든 서비스를 빌드하고 실행합니다.
+    ```bash
+    ip는 본인 설정에 맞게 재구성
 
+    
+     curl https://ifconfig.me/
+cmd에서 ㄱ ip 확인
+ex) 1.222.116.189
+
+----
+sudo apt-get update
+sudo apt-get install strongswan
+
+# /etc/sysctl.conf 파일을 엽니다.
+sudo vi /etc/sysctl.conf
+
+# 파일 내용에 다음 줄이 있는지 확인하고, 없으면 추가하거나 주석을 해제합니다.
+net.ipv4.ip_forward = 1
+
+# 설정을 즉시 적용합니다.
+sudo sysctl -p
+
+
+
+
+
+----
+sudo vi /etc/ipsec.secrets
+
+1.222.116.189 34.158.217.159 : PSK "bYG5BkG1alinvYqdditJCaDq6fA0F6ww"
+
+
+
+
+
+
+
+
+
+
+
+----
+sudo vi /etc/ipsec.conf
+
+
+
+config setup
+        # strictcrlpolicy=yes
+        # uniqueids = no
+# --- 🌟 GCP VPN 연결 설정 추가 🌟 ---
+conn gcp-vpn                     # 연결 이름 (원하는 대로 지정 가능)
+    authby=secret               # 인증 방식: 공유 비밀 키 사용
+    auto=start                  # strongSwan 시작 시 자동으로 터널 연결 시도
+    keyexchange=ikev2           # IKE 버전: IKEv2 사용 (GCP 설정과 일치)
+    type=tunnel                 # 연결 타입: 터널 모드
+
+    # --- 사용자 VM (로컬) 측 설정 ---
+    left=%defaultroute          # VM의 기본 인터넷 경로 사용
+    leftid=1.222.116.189        # 👈 사용자 VM의 공인 IP 주소 입력
+
+# VM(쿠버네티스)의 내부 네트워크 대역 (GCP '원격 네트워크 IP 범위'에 입력한 값과 일치해야 함)
+
+    leftsubnet=10.0.2.0/24, 10.111.0.0/16, 20.96.0.0/12, 192.168.56.0/24, 192.168.0.0/24, 10.244.0.0/16
+#    leftsubnet=192.168.56.0/24,10.96.0.0/12
+
+    # --- GCP (원격) 측 설정 ---
+    right=34.158.217.159    # 👈 GCP VPN 게이트웨이의 공인 IP 주소 입력 (GCP 콘솔에서 확인)
+    # GCP VPC 서브넷 대역 (GCP '로컬 IP 범위'에 입력한 값과 일치해야 함)
+    rightsubnet=10.178.0.0/20   # 👈 GCP에 '10.178.0.0/20'을 입력했으므로 여기도 동일하게 입력
+
+    # --- 암호화 설정 (GCP 기본값과 일치시킴) ---
+    ike=aes256-sha2_256-modp1024!
+    esp=aes256-sha2_256!
+
+    # --- 연결 유지 옵션 (권장) ---
+    dpdaction=restart           # 연결 끊김 감지 시 재시작
+    dpddelay=30s                # 30초마다 연결 상태 확인
+    dpdtimeout=300s             # 120초 응답 없으면 연결 끊김으로 간주
+    keyingtries=%forever        # 연결될 때까지 계속 시도
+
+
+
+
+
+
+
+
+----
+# 설정 적용을 위해 strongSwan을 재시작합니다.
+sudo ipsec restart
+
+# 잠시 후 터널이 연결되었는지 확인합니다.
+sudo ipsec status
+
+redis-cli -h 10.178.0.7 ping
+
+        leftsubnet=192.168.56.0/24,10.111.0.0/16,10.109.0.0/16
+
+
+
+0cIBtR+NU7HZpyHnvhHaQRsLNEq5o49f
+
+흐름도, 하버, 도커 ip, openai 시크릿키, strongSwan? ,IPSec?
+입력시 -- gpc 모니터링
+    
+    ```
     ```bash
     docker compose build
     docker compose up -d
@@ -54,9 +158,8 @@ MBTI 성향 테스트 기반의 방명록과 만세력 데이터를 활용한 �
 
 ---
 
-## 🚢 Kubernetes 배포 (프로덕션)
+## 🚢 Kubernetes 배포
 
-(이 프로젝트가 `/k8s` 디렉토리에 K8s 매니페스트(YAML) 파일들을 포함하고 있다고 가정합니다.)
 
 1.  **VPN 확인:** `k8s-master` 노드의 `strongSwan` VPN 연결이 활성화되어 있는지 확인합니다.
 2.  **라우팅 설정:** 모든 **워커 노드(Worker Nodes)**가 VPN 게이트웨이(`k8s-master`)를 통해 GCP Redis 대역(`10.178.0.0/20`)으로 라우팅되도록 `ip route add` 규칙이 설정되어 있는지 확인합니다.
@@ -65,7 +168,7 @@ MBTI 성향 테스트 기반의 방명록과 만세력 데이터를 활용한 �
 
     ```bash
     # 예시: k8s YAML 파일들이 있는 디렉토리에서 실행
-    kubectl apply -f ./k8s/
+    kubectl apply -f 파일명
     ```
 
 
@@ -73,5 +176,12 @@ MBTI 성향 테스트 기반의 방명록과 만세력 데이터를 활용한 �
 <img width="1899" height="923" alt="image" src="https://github.com/user-attachments/assets/38443361-052a-4018-90e5-d3f8d9291a54" />
 <img width="1441" height="910" alt="image" src="https://github.com/user-attachments/assets/66323830-8358-49bd-a360-ff485b77fa03" />
 <img width="741" height="825" alt="image" src="https://github.com/user-attachments/assets/3f743be2-c738-4015-aadb-8f286325470f" />
+
+## k8s 설계도
+인프라 설계도
+<img width="1346" height="756" alt="image" src="https://github.com/user-attachments/assets/22d65d52-d5b7-4958-9b04-e07e74a878f3" />
+애플리케이션 설계도
+<img width="1324" height="734" alt="image" src="https://github.com/user-attachments/assets/3bcabe43-3b91-4fd4-906d-ad3c848938f6" />
+
 
 
