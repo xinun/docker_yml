@@ -4,6 +4,18 @@ MBTI 성향 테스트 기반의 방명록과 만세력 데이터를 활용한 �
 
 ---
 
+## k8s 설계도
+인프라 설계도
+<img width="1346" height="756" alt="image" src="https://github.com/user-attachments/assets/22d65d52-d5b7-4958-9b04-e07e74a878f3" />
+## 애플리케이션 설계도
+<img width="1324" height="734" alt="image" src="https://github.com/user-attachments/assets/3bcabe43-3b91-4fd4-906d-ad3c848938f6" />
+
+
+
+
+
+
+
 ## 🛠️ 기술 스택 (Tech Stack)
 
 ![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white)
@@ -176,12 +188,6 @@ redis-cli -h 10.178.0.7 ping
 <img width="1899" height="923" alt="image" src="https://github.com/user-attachments/assets/38443361-052a-4018-90e5-d3f8d9291a54" />
 <img width="1441" height="910" alt="image" src="https://github.com/user-attachments/assets/66323830-8358-49bd-a360-ff485b77fa03" />
 <img width="741" height="825" alt="image" src="https://github.com/user-attachments/assets/3f743be2-c738-4015-aadb-8f286325470f" />
-
-## k8s 설계도
-인프라 설계도
-<img width="1346" height="756" alt="image" src="https://github.com/user-attachments/assets/22d65d52-d5b7-4958-9b04-e07e74a878f3" />
-애플리케이션 설계도
-<img width="1324" height="734" alt="image" src="https://github.com/user-attachments/assets/3bcabe43-3b91-4fd4-906d-ad3c848938f6" />
 
 
 
